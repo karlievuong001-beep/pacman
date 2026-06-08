@@ -95,10 +95,10 @@
         .setting-group label { display: block; margin-bottom: 10px; font-weight: bold; color: #00FFFF; }
         .setting-group input[type="text"], .setting-group input[type="file"] { 
             width: 100%; padding: 10px; box-sizing: border-box; background: #000; 
-            color: #fff; border: 1px solid #555; border-radius: 4px; margin-bottom: 10px;
+            color: #fff; border: 1px solid #555; border-radius: 4px; margin-bottom: 0;
         }
         .btn-action {
-            background: #1919A6; color: white; border: none; padding: 8px 15px; 
+            background: #1919A6; color: white; border: none; padding: 10px 20px; 
             border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;
         }
         .btn-action:hover { background: #00FFFF; color: black; }
@@ -170,17 +170,21 @@
             <div class="settings-scroll-area">
                 <div class="setting-group">
                     <label>Method 1: Upload File (.json)</label>
-                    <input type="file" id="fileUpload" accept=".json">
+                    <div style="display:flex; gap:10px;">
+                        <input type="file" id="fileUpload" accept=".json">
+                        <button class="btn-action" onclick="loadFromFile(this)">LOAD</button>
+                    </div>
+                    <small style="color: #aaa; font-size: 12px; margin-top: 5px; display: block;">* Select a file, then click LOAD.</small>
                 </div>
                 <div class="setting-group">
                     <label>Method 2: Google Sheets API Link</label>
                     <div style="display:flex; gap:10px;">
-                        <input type="text" id="sheetLink" placeholder="Paste https://script.google.com/... link here" style="margin-bottom:0;">
+                        <input type="text" id="sheetLink" placeholder="Paste https://script.google.com/... link here">
                         <button class="btn-action" onclick="loadFromSheet(this)">LOAD</button>
                     </div>
                 </div>
                 <div class="setting-group" style="background: transparent; border: none; padding: 0;">
-                    <label style="font-size: 16px; border-bottom: 2px solid #333; padding-bottom: 10px;">Method 3: Direct Builder</label>
+                    <label style="font-size: 16px; border-bottom: 2px solid #333; padding-bottom: 10px;">Method 3: Direct Builder (Preview)</label>
                     <div id="questions-builder"></div>
                     <button class="add-q-btn" onclick="addEmptyQuestionBlock()">+ ADD NEW QUESTION</button>
                 </div>
@@ -354,6 +358,31 @@
                 closeSettings();
             };
 
+            // TẢI TỪ FILE JSON (CÁCH 1)
+            window.loadFromFile = function(btn) {
+                const fileInput = document.getElementById('fileUpload');
+                const file = fileInput.files[0];
+                if (!file) { alert("Please select a .json file first!"); return; }
+
+                btn.innerText = "...";
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (Array.isArray(data) && data.length > 0) { 
+                            questions = data; 
+                            renderBuilder(); // Đổ dữ liệu vào Method 3
+                            alert(`Success! Loaded ${questions.length} questions into the Builder. Please review and click SAVE & CLOSE.`); 
+                        } else {
+                            alert("Format Error: The JSON file must be an array of questions.");
+                        }
+                    } catch (err) { alert("JSON Format Error: " + err.message); }
+                    btn.innerText = "LOAD";
+                };
+                reader.readAsText(file);
+            };
+
+            // TẢI TỪ LINK GOOGLE SHEETS (CÁCH 2)
             window.loadFromSheet = async function(btn) {
                 const link = document.getElementById('sheetLink').value;
                 if(!link) { alert("Please paste a link!"); return; }
@@ -361,23 +390,14 @@
                     btn.innerText = "...";
                     const response = await fetch(link);
                     const data = await response.json();
-                    if(data && data.length > 0) { questions = data; renderBuilder(); alert("Loaded successfully!"); }
+                    if(data && data.length > 0) { 
+                        questions = data; 
+                        renderBuilder(); // Đổ dữ liệu vào Method 3
+                        alert(`Success! Loaded ${questions.length} questions into the Builder. Please review and click SAVE & CLOSE.`); 
+                    }
                     btn.innerText = "LOAD";
                 } catch(e) { alert("Error: " + e.message); btn.innerText = "LOAD"; }
             };
-
-            document.getElementById('fileUpload').addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    try {
-                        const data = JSON.parse(e.target.result);
-                        if (Array.isArray(data) && data.length > 0) { questions = data; renderBuilder(); alert(`Updated ${questions.length} questions from JSON file.`); }
-                    } catch (err) { alert("Error: " + err.message); }
-                };
-                reader.readAsText(file);
-            });
 
             // --- GAME CONTROLS ---
             window.startGame = function() {
