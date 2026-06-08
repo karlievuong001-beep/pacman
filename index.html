@@ -14,12 +14,11 @@
             display: flex; justify-content: center; align-items: center; height: 100vh;
         }
 
-        /* --- GIAO DIỆN MÀN HÌNH CHỜ MÀU VÀNG --- */
         #start-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #FFDE00; 
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 9999; /* Ép luôn hiển thị lên trên cùng */
+            z-index: 9999; 
         }
         
         .hamburger {
@@ -74,7 +73,7 @@
         }
         
         .game-scale-wrapper {
-            width: 85vh; max-width: 95vw;
+            width: 85vh; max-width: 95vw; position: relative;
         }
 
         #header {
@@ -88,7 +87,7 @@
             background-color: black; display: block; image-rendering: pixelated; 
         }
 
-        /* --- MODAL CÂU HỎI --- */
+        /* --- MODAL & GAME OVER --- */
         #modal { 
             display: none; position: fixed; top: 0; left: 0; 
             width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100; 
@@ -105,6 +104,11 @@
             cursor: pointer; font-size: 18px; font-weight: bold; text-align: left; transition: 0.2s;
         }
         .btn:hover { background: #1919A6; border-color: white; }
+
+        #game-over-text {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 40px; color: red; text-shadow: 2px 2px 0px yellow; z-index: 50; text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -125,9 +129,10 @@
 
     <div id="game-container">
         <div class="game-scale-wrapper">
+            <div id="game-over-text">GAME OVER</div>
             <div id="header">
                 <div>1UP<span id="score" class="highlight">0</span></div>
-                <div>HIGH SCORE<span class="highlight">10000</span></div>
+                <div>LIVES<span id="lives" class="highlight">3</span></div>
                 <div>DOTS / QUA<span id="dot-count" class="highlight">0 / 5</span></div>
             </div>
             <canvas id="gameCanvas" width="420" height="460"></canvas>
@@ -142,17 +147,18 @@
     </div>
 
     <script>
-        // Bọc toàn bộ script để đảm bảo an toàn tuyệt đối khi load web
         document.addEventListener("DOMContentLoaded", () => {
             const canvas = document.getElementById("gameCanvas");
             const ctx = canvas.getContext("2d");
             
-            let score = 0, dotCount = 0, isPaused = true, gameLoop;
+            let score = 0, dotCount = 0, lives = 3;
+            let isPaused = true, isGameOver = false, gameLoop;
+            let powerTimer = null;
             const tileSize = 20;
             
             const map = [
                 [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
+                [1,4,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,4,1],
                 [1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1],
                 [1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1],
                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
@@ -170,7 +176,7 @@
                 [1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
                 [1,1,1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,1,1],
                 [1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,1],
-                [1,0,1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,0,1],
+                [1,4,1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,4,1],
                 [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
                 [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
             ];
@@ -179,10 +185,10 @@
             let nextDx = 0, nextDy = 0;
 
             let ghosts = [
-                { x: 9 * tileSize, y: 10 * tileSize, color: "red", dx: -2, dy: 0 },    
-                { x: 10 * tileSize, y: 10 * tileSize, color: "#FFB8FF", dx: 0, dy: -2 }, 
-                { x: 11 * tileSize, y: 10 * tileSize, color: "#00FFFF", dx: 2, dy: 0 },  
-                { x: 10 * tileSize, y: 9 * tileSize, color: "#FFB852", dx: -2, dy: 0 }   
+                { x: 9 * tileSize, y: 10 * tileSize, color: "red", dx: -2, dy: 0, isVulnerable: false },    
+                { x: 10 * tileSize, y: 10 * tileSize, color: "#FFB8FF", dx: 0, dy: -2, isVulnerable: false }, 
+                { x: 11 * tileSize, y: 10 * tileSize, color: "#00FFFF", dx: 2, dy: 0, isVulnerable: false },  
+                { x: 10 * tileSize, y: 9 * tileSize, color: "#FFB852", dx: -2, dy: 0, isVulnerable: false }   
             ];
 
             let questions = [
@@ -192,7 +198,6 @@
                 { q: "Find the error: 'She don't like playing tennis.'", options: ["A. She", "B. don't", "C. like", "D. playing"], correct: 1 }
             ];
 
-            // Hàm chuyển từ Màn hình chờ sang Game
             window.startGame = function() {
                 document.getElementById("start-screen").style.display = "none";
                 document.getElementById("game-container").style.display = "flex";
@@ -201,6 +206,7 @@
             };
 
             document.addEventListener("keydown", (e) => {
+                if (isGameOver) return;
                 if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
                 if (e.key === "ArrowUp") { nextDx = 0; nextDy = -2; }
                 if (e.key === "ArrowDown") { nextDx = 0; nextDy = 2; }
@@ -217,9 +223,11 @@
                         } else if (map[r][c] === 0) {
                             ctx.fillStyle = "#FFB8AE"; ctx.beginPath();
                             ctx.arc(c * tileSize + tileSize/2, r * tileSize + tileSize/2, 2.5, 0, Math.PI*2); ctx.fill();
+                        } else if (map[r][c] === 4) {
+                            ctx.fillStyle = "white"; ctx.beginPath(); // Chấm bự
+                            ctx.arc(c * tileSize + tileSize/2, r * tileSize + tileSize/2, 6, 0, Math.PI*2); ctx.fill();
                         } else if (map[r][c] === 3) {
-                            ctx.fillStyle = "pink"; 
-                            ctx.fillRect(c * tileSize, r * tileSize + 8, tileSize, 4);
+                            ctx.fillStyle = "pink"; ctx.fillRect(c * tileSize, r * tileSize + 8, tileSize, 4);
                         }
                     }
                 }
@@ -229,13 +237,9 @@
                 ctx.beginPath();
                 let mouthOpen = isPaused ? 0.2 : (Math.sin(player.mouth) * 0.2 + 0.2); 
                 player.mouth += 0.4;
-                
                 let angle = 0;
-                if (player.dx > 0) angle = 0;
-                else if (player.dx < 0) angle = Math.PI;
-                else if (player.dy > 0) angle = Math.PI / 2;
-                else if (player.dy < 0) angle = -Math.PI / 2;
-
+                if (player.dx > 0) angle = 0; else if (player.dx < 0) angle = Math.PI;
+                else if (player.dy > 0) angle = Math.PI / 2; else if (player.dy < 0) angle = -Math.PI / 2;
                 ctx.arc(player.x + tileSize/2, player.y + tileSize/2, player.size, angle + mouthOpen * Math.PI, angle + (2 - mouthOpen) * Math.PI);
                 ctx.lineTo(player.x + tileSize/2, player.y + tileSize/2);
                 ctx.fillStyle = "yellow"; ctx.fill(); ctx.closePath();
@@ -243,7 +247,7 @@
 
             function drawGhosts() {
                 ghosts.forEach(g => {
-                    ctx.fillStyle = g.color;
+                    ctx.fillStyle = g.isVulnerable ? "#0033ff" : g.color; // Chuyển xanh khi yếu
                     ctx.beginPath();
                     let gx = g.x + 2, gy = g.y + 2, gw = 16, gh = 16;
                     ctx.arc(gx + gw/2, gy + gh/2, gw/2, Math.PI, 0); 
@@ -257,7 +261,7 @@
                     ctx.fillStyle = "white";
                     ctx.beginPath(); ctx.arc(gx+5, gy+6, 3, 0, Math.PI*2); ctx.fill();
                     ctx.beginPath(); ctx.arc(gx+11, gy+6, 3, 0, Math.PI*2); ctx.fill();
-                    ctx.fillStyle = "blue";
+                    ctx.fillStyle = g.isVulnerable ? "white" : "blue"; // Mắt khác biệt khi chạy trốn
                     let ex = g.dx > 0 ? 1 : (g.dx < 0 ? -1 : 0);
                     let ey = g.dy > 0 ? 1 : (g.dy < 0 ? -1 : 0);
                     ctx.beginPath(); ctx.arc(gx+5+ex, gy+6+ey, 1.5, 0, Math.PI*2); ctx.fill();
@@ -275,35 +279,86 @@
                 return map[top][left] === 1 || map[top][right] === 1 || map[bottom][left] === 1 || map[bottom][right] === 1 || map[top][left] === 3 || map[top][right] === 3;
             }
 
+            function activatePowerPellet() {
+                ghosts.forEach(g => { g.isVulnerable = true; });
+                if (powerTimer) clearTimeout(powerTimer);
+                powerTimer = setTimeout(() => {
+                    ghosts.forEach(g => { g.isVulnerable = false; });
+                }, 10000); // 10 giây hồi phục
+            }
+
             function updateGhosts() {
                 ghosts.forEach(g => {
-                    if (isWall(g.x + g.dx, g.y + g.dy) || (g.x % tileSize === 0 && g.y % tileSize === 0 && Math.random() < 0.3)) {
-                        let possibleMoves = [
-                            {dx: 2, dy: 0}, {dx: -2, dy: 0}, {dx: 0, dy: 2}, {dx: 0, dy: -2}
-                        ].filter(m => !isWall(g.x + m.dx, g.y + m.dy) && (m.dx !== -g.dx || m.dy !== -g.dy));
+                    let speed = g.isVulnerable ? 1 : 2; // Chậm lại khi bị yếu
+                    
+                    // Logic AI thông minh: Chỉ tính toán khi nằm chính giữa ô
+                    if (g.x % tileSize === 0 && g.y % tileSize === 0) {
+                        let c = g.x / tileSize; let r = g.y / tileSize;
+                        let validMoves = [];
                         
-                        if (possibleMoves.length > 0) {
-                            let move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-                            g.dx = move.dx; g.dy = move.dy;
+                        let dirX = g.dx > 0 ? 1 : (g.dx < 0 ? -1 : 0);
+                        let dirY = g.dy > 0 ? 1 : (g.dy < 0 ? -1 : 0);
+
+                        // Tìm đường không đụng tường và không quay ngược lại
+                        if (dirX !== -1 && c + 1 < map[0].length && map[r][c+1] !== 1 && map[r][c+1] !== 3) validMoves.push({dx: speed, dy: 0});
+                        if (dirX !== 1 && c - 1 >= 0 && map[r][c-1] !== 1 && map[r][c-1] !== 3) validMoves.push({dx: -speed, dy: 0});
+                        if (dirY !== -1 && r + 1 < map.length && map[r+1][c] !== 1 && map[r+1][c] !== 3) validMoves.push({dx: 0, dy: speed});
+                        if (dirY !== 1 && r - 1 >= 0 && map[r-1][c] !== 1 && map[r-1][c] !== 3) validMoves.push({dx: 0, dy: -speed});
+
+                        if (validMoves.length > 0) {
+                            // Sắp xếp lối đi dựa trên khoảng cách tới Pacman
+                            validMoves.sort((a, b) => {
+                                let distA = Math.hypot((g.x + a.dx*10) - player.x, (g.y + a.dy*10) - player.y);
+                                let distB = Math.hypot((g.x + b.dx*10) - player.x, (g.y + b.dy*10) - player.y);
+                                return g.isVulnerable ? distB - distA : distA - distB; // Nếu yếu thì chạy ra xa, nếu khỏe thì rượt
+                            });
+                            // Thêm chút ngẫu nhiên để ma không dính lẹo vào nhau
+                            let chosenMove = validMoves[0];
+                            if (validMoves.length > 1 && Math.random() < 0.2) chosenMove = validMoves[1];
+                            
+                            g.dx = chosenMove.dx; g.dy = chosenMove.dy;
                         } else {
-                            // Chống kẹt ma
-                            g.dx = -g.dx; g.dy = -g.dy;
+                            g.dx = -g.dx; g.dy = -g.dy; // Ngõ cụt thì quay đầu
                         }
                     }
+
                     g.x += g.dx; g.y += g.dy;
 
                     if (g.x < -tileSize) g.x = canvas.width;
                     if (g.x > canvas.width) g.x = -tileSize;
 
+                    // Xử lý Va chạm với Pacman
                     if (Math.hypot(player.x - g.x, player.y - g.y) < 15) {
-                        alert("PAC-MAN ĐÃ BỊ BẮT! Trò chơi sẽ bắt đầu lại.");
-                        location.reload(); 
+                        if (g.isVulnerable) {
+                            score += 200; document.getElementById("score").innerText = score;
+                            g.x = 10 * tileSize; g.y = 10 * tileSize; // Bị tiêu diệt, đưa về chuồng
+                            g.isVulnerable = false;
+                        } else {
+                            handleDeath();
+                        }
                     }
                 });
             }
 
+            function handleDeath() {
+                lives--; document.getElementById("lives").innerText = lives;
+                if (lives <= 0) {
+                    isGameOver = true;
+                    document.getElementById("game-over-text").style.display = "block";
+                } else {
+                    isPaused = true;
+                    setTimeout(() => {
+                        player.x = 10 * tileSize; player.y = 16 * tileSize; player.dx = 0; player.dy = 0;
+                        ghosts.forEach((g, i) => {
+                            g.x = (9 + i%3) * tileSize; g.y = 10 * tileSize;
+                        });
+                        isPaused = false;
+                    }, 1000);
+                }
+            }
+
             function update() {
-                if (isPaused) return;
+                if (isPaused || isGameOver) return;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 drawMap();
 
@@ -320,12 +375,16 @@
                 let centerC = Math.floor((player.x + tileSize/2) / tileSize);
                 let centerR = Math.floor((player.y + tileSize/2) / tileSize);
 
-                if (centerC >= 0 && centerC < map[0].length && map[centerR] && map[centerR][centerC] === 0) {
-                    map[centerR][centerC] = 2; score += 10; dotCount++;
-                    document.getElementById("score").innerText = score;
-                    document.getElementById("dot-count").innerText = dotCount + " / 5";
-                    
-                    if (dotCount === 5) { setTimeout(triggerQuestion, 100); }
+                if (centerC >= 0 && centerC < map[0].length && map[centerR]) {
+                    if (map[centerR][centerC] === 0) { // Ăn chấm nhỏ
+                        map[centerR][centerC] = 2; score += 10; dotCount++;
+                        document.getElementById("score").innerText = score;
+                        document.getElementById("dot-count").innerText = dotCount + " / 5";
+                        if (dotCount === 5) { setTimeout(triggerQuestion, 100); }
+                    } else if (map[centerR][centerC] === 4) { // Ăn siêu chấm
+                        map[centerR][centerC] = 2; score += 50; document.getElementById("score").innerText = score;
+                        activatePowerPellet();
+                    }
                 }
 
                 updateGhosts();
