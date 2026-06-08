@@ -58,4 +58,308 @@
             animation: chomp 0.2s alternate infinite;
         }
 
-        @keyframes movePacman { 0% { left: -40px; } 100% { left: 260px; }
+        @keyframes movePacman { 0% { left: -40px; } 100% { left: 260px; } }
+        @keyframes chomp {
+            0% { clip-path: polygon(100% 74%, 50% 50%, 100% 26%, 100% 0, 0 0, 0 100%, 100% 100%); }
+            100% { clip-path: polygon(100% 50%, 50% 50%, 100% 50%, 100% 0, 0 0, 0 100%, 100% 100%); }
+        }
+        
+        .start-text { color: black; margin-top: 30px; font-size: 14px; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* --- GIAO DIỆN GAME --- */
+        #game-container { 
+            display: none; width: 100vw; height: 100vh; 
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        
+        .game-scale-wrapper {
+            width: 85vh; max-width: 95vw;
+        }
+
+        #header {
+            display: flex; justify-content: space-between; width: 100%;
+            margin-bottom: 2vh; font-size: 14px; color: #fff; text-align: center;
+        }
+        .highlight { color: #ffff00; font-size: 18px; margin-top: 10px; display: block; }
+        
+        canvas { 
+            width: 100%; height: auto; 
+            background-color: black; display: block; image-rendering: pixelated; 
+        }
+
+        /* --- MODAL CÂU HỎI --- */
+        #modal { 
+            display: none; position: fixed; top: 0; left: 0; 
+            width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100; 
+        }
+        #modal-content { 
+            background: black; padding: 30px; width: 600px; max-width: 90vw;
+            margin: 15vh auto; border: 4px solid #1919A6; border-radius: 10px;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+        }
+        #question-text { color: yellow; margin-bottom: 20px; font-weight: bold; font-family: 'Press Start 2P', cursive; line-height: 1.5; font-size: 16px; }
+        .btn { 
+            display: block; width: 100%; margin: 12px 0; padding: 15px; 
+            background: #222; color: white; border: 2px solid #555; 
+            cursor: pointer; font-size: 18px; font-weight: bold; text-align: left; transition: 0.2s;
+        }
+        .btn:hover { background: #1919A6; border-color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <div class="hamburger"><div></div><div></div><div></div></div>
+        <div class="start-box" onclick="startGame()">
+            <div class="demo-dots">
+                <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+            </div>
+            <div class="demo-pacman-container">
+                <div class="pacman-mask"></div>
+                <div class="demo-pacman"></div>
+            </div>
+        </div>
+        <div class="start-text">CLICK THE BOX TO START</div>
+    </div>
+
+    <div id="game-container">
+        <div class="game-scale-wrapper">
+            <div id="header">
+                <div>1UP<span id="score" class="highlight">0</span></div>
+                <div>HIGH SCORE<span class="highlight">10000</span></div>
+                <div>DOTS / QUA<span id="dot-count" class="highlight">0 / 5</span></div>
+            </div>
+            <canvas id="gameCanvas" width="420" height="460"></canvas>
+        </div>
+    </div>
+
+    <div id="modal">
+        <div id="modal-content">
+            <h2 id="question-text">Loading...</h2>
+            <div id="answers"></div>
+        </div>
+    </div>
+
+    <script>
+        // Bọc toàn bộ script để đảm bảo an toàn tuyệt đối khi load web
+        document.addEventListener("DOMContentLoaded", () => {
+            const canvas = document.getElementById("gameCanvas");
+            const ctx = canvas.getContext("2d");
+            
+            let score = 0, dotCount = 0, isPaused = true, gameLoop;
+            const tileSize = 20;
+            
+            const map = [
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
+                [1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1],
+                [1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1],
+                [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                [1,0,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,0,1],
+                [1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,1],
+                [1,1,1,1,1,0,1,1,1,2,1,2,1,1,1,0,1,1,1,1,1],
+                [2,2,2,2,1,0,1,2,2,2,2,2,2,2,1,0,1,2,2,2,2],
+                [1,1,1,1,1,0,1,2,1,1,3,1,1,2,1,0,1,1,1,1,1],
+                [2,2,2,2,2,0,2,2,1,2,2,2,1,2,2,0,2,2,2,2,2],
+                [1,1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1,1],
+                [2,2,2,2,1,0,1,2,2,2,2,2,2,2,1,0,1,2,2,2,2],
+                [1,1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1,1],
+                [1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
+                [1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1],
+                [1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+                [1,1,1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,1,1],
+                [1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,1],
+                [1,0,1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,0,1],
+                [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+            ];
+
+            let player = { x: 10 * tileSize, y: 16 * tileSize, dx: 0, dy: 0, size: 9, mouth: 0 };
+            let nextDx = 0, nextDy = 0;
+
+            let ghosts = [
+                { x: 9 * tileSize, y: 10 * tileSize, color: "red", dx: -2, dy: 0 },    
+                { x: 10 * tileSize, y: 10 * tileSize, color: "#FFB8FF", dx: 0, dy: -2 }, 
+                { x: 11 * tileSize, y: 10 * tileSize, color: "#00FFFF", dx: 2, dy: 0 },  
+                { x: 10 * tileSize, y: 9 * tileSize, color: "#FFB852", dx: -2, dy: 0 }   
+            ];
+
+            let questions = [
+                { q: "Choose the correct preposition: 'He is good ___ math.'", options: ["A. in", "B. at", "C. on", "D. with"], correct: 1 },
+                { q: "What is the synonym of 'Significant'?", options: ["A. Trivial", "B. Important", "C. Small", "D. Hidden"], correct: 1 },
+                { q: "Complete: 'If it rains, we _____ stay home.'", options: ["A. will", "B. would", "C. had", "D. are"], correct: 0 },
+                { q: "Find the error: 'She don't like playing tennis.'", options: ["A. She", "B. don't", "C. like", "D. playing"], correct: 1 }
+            ];
+
+            // Hàm chuyển từ Màn hình chờ sang Game
+            window.startGame = function() {
+                document.getElementById("start-screen").style.display = "none";
+                document.getElementById("game-container").style.display = "flex";
+                isPaused = false;
+                gameLoop = setInterval(update, 25);
+            };
+
+            document.addEventListener("keydown", (e) => {
+                if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
+                if (e.key === "ArrowUp") { nextDx = 0; nextDy = -2; }
+                if (e.key === "ArrowDown") { nextDx = 0; nextDy = 2; }
+                if (e.key === "ArrowLeft") { nextDx = -2; nextDy = 0; }
+                if (e.key === "ArrowRight") { nextDx = 2; nextDy = 0; }
+            });
+
+            function drawMap() {
+                for (let r = 0; r < map.length; r++) {
+                    for (let c = 0; c < map[r].length; c++) {
+                        if (map[r][c] === 1) {
+                            ctx.strokeStyle = "#1919A6"; ctx.lineWidth = 2;
+                            ctx.strokeRect(c * tileSize, r * tileSize, tileSize, tileSize);
+                        } else if (map[r][c] === 0) {
+                            ctx.fillStyle = "#FFB8AE"; ctx.beginPath();
+                            ctx.arc(c * tileSize + tileSize/2, r * tileSize + tileSize/2, 2.5, 0, Math.PI*2); ctx.fill();
+                        } else if (map[r][c] === 3) {
+                            ctx.fillStyle = "pink"; 
+                            ctx.fillRect(c * tileSize, r * tileSize + 8, tileSize, 4);
+                        }
+                    }
+                }
+            }
+
+            function drawPlayer() {
+                ctx.beginPath();
+                let mouthOpen = isPaused ? 0.2 : (Math.sin(player.mouth) * 0.2 + 0.2); 
+                player.mouth += 0.4;
+                
+                let angle = 0;
+                if (player.dx > 0) angle = 0;
+                else if (player.dx < 0) angle = Math.PI;
+                else if (player.dy > 0) angle = Math.PI / 2;
+                else if (player.dy < 0) angle = -Math.PI / 2;
+
+                ctx.arc(player.x + tileSize/2, player.y + tileSize/2, player.size, angle + mouthOpen * Math.PI, angle + (2 - mouthOpen) * Math.PI);
+                ctx.lineTo(player.x + tileSize/2, player.y + tileSize/2);
+                ctx.fillStyle = "yellow"; ctx.fill(); ctx.closePath();
+            }
+
+            function drawGhosts() {
+                ghosts.forEach(g => {
+                    ctx.fillStyle = g.color;
+                    ctx.beginPath();
+                    let gx = g.x + 2, gy = g.y + 2, gw = 16, gh = 16;
+                    ctx.arc(gx + gw/2, gy + gh/2, gw/2, Math.PI, 0); 
+                    ctx.lineTo(gx + gw, gy + gh); 
+                    ctx.lineTo(gx + gw*0.75, gy + gh - 3); 
+                    ctx.lineTo(gx + gw*0.5, gy + gh); 
+                    ctx.lineTo(gx + gw*0.25, gy + gh - 3); 
+                    ctx.lineTo(gx, gy + gh); 
+                    ctx.closePath(); ctx.fill();
+                    
+                    ctx.fillStyle = "white";
+                    ctx.beginPath(); ctx.arc(gx+5, gy+6, 3, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(gx+11, gy+6, 3, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = "blue";
+                    let ex = g.dx > 0 ? 1 : (g.dx < 0 ? -1 : 0);
+                    let ey = g.dy > 0 ? 1 : (g.dy < 0 ? -1 : 0);
+                    ctx.beginPath(); ctx.arc(gx+5+ex, gy+6+ey, 1.5, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(gx+11+ex, gy+6+ey, 1.5, 0, Math.PI*2); ctx.fill();
+                });
+            }
+
+            function isWall(x, y) {
+                let margin = 3;
+                let left = Math.floor((x + margin) / tileSize), right = Math.floor((x + tileSize - margin - 1) / tileSize);
+                let top = Math.floor((y + margin) / tileSize), bottom = Math.floor((y + tileSize - margin - 1) / tileSize);
+                
+                if (left < 0 || right >= map[0].length) return false; 
+                if (top < 0 || bottom >= map.length) return true;
+                return map[top][left] === 1 || map[top][right] === 1 || map[bottom][left] === 1 || map[bottom][right] === 1 || map[top][left] === 3 || map[top][right] === 3;
+            }
+
+            function updateGhosts() {
+                ghosts.forEach(g => {
+                    if (isWall(g.x + g.dx, g.y + g.dy) || (g.x % tileSize === 0 && g.y % tileSize === 0 && Math.random() < 0.3)) {
+                        let possibleMoves = [
+                            {dx: 2, dy: 0}, {dx: -2, dy: 0}, {dx: 0, dy: 2}, {dx: 0, dy: -2}
+                        ].filter(m => !isWall(g.x + m.dx, g.y + m.dy) && (m.dx !== -g.dx || m.dy !== -g.dy));
+                        
+                        if (possibleMoves.length > 0) {
+                            let move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                            g.dx = move.dx; g.dy = move.dy;
+                        } else {
+                            // Chống kẹt ma
+                            g.dx = -g.dx; g.dy = -g.dy;
+                        }
+                    }
+                    g.x += g.dx; g.y += g.dy;
+
+                    if (g.x < -tileSize) g.x = canvas.width;
+                    if (g.x > canvas.width) g.x = -tileSize;
+
+                    if (Math.hypot(player.x - g.x, player.y - g.y) < 15) {
+                        alert("PAC-MAN ĐÃ BỊ BẮT! Trò chơi sẽ bắt đầu lại.");
+                        location.reload(); 
+                    }
+                });
+            }
+
+            function update() {
+                if (isPaused) return;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawMap();
+
+                if (!isWall(player.x + nextDx, player.y + nextDy)) {
+                    player.dx = nextDx; player.dy = nextDy;
+                }
+                if (!isWall(player.x + player.dx, player.y + player.dy)) {
+                    player.x += player.dx; player.y += player.dy;
+                }
+
+                if (player.x < -tileSize) player.x = canvas.width;
+                if (player.x > canvas.width) player.x = -tileSize;
+
+                let centerC = Math.floor((player.x + tileSize/2) / tileSize);
+                let centerR = Math.floor((player.y + tileSize/2) / tileSize);
+
+                if (centerC >= 0 && centerC < map[0].length && map[centerR] && map[centerR][centerC] === 0) {
+                    map[centerR][centerC] = 2; score += 10; dotCount++;
+                    document.getElementById("score").innerText = score;
+                    document.getElementById("dot-count").innerText = dotCount + " / 5";
+                    
+                    if (dotCount === 5) { setTimeout(triggerQuestion, 100); }
+                }
+
+                updateGhosts();
+                drawPlayer();
+                drawGhosts();
+            }
+
+            function triggerQuestion() {
+                isPaused = true;
+                const modal = document.getElementById("modal");
+                const qData = questions[Math.floor(Math.random() * questions.length)];
+                document.getElementById("question-text").innerText = qData.q;
+                const ansDiv = document.getElementById("answers");
+                ansDiv.innerHTML = "";
+                qData.options.forEach((opt, index) => {
+                    let btn = document.createElement("button");
+                    btn.className = "btn"; btn.innerText = opt;
+                    btn.onclick = () => checkAnswer(index, qData.correct);
+                    ansDiv.appendChild(btn);
+                });
+                modal.style.display = "block";
+            }
+
+            window.checkAnswer = function(selectedIndex, correctIndex) {
+                if (selectedIndex === correctIndex) { 
+                    score += 50; document.getElementById("score").innerText = score;
+                    dotCount = 0; document.getElementById("dot-count").innerText = dotCount + " / 5";
+                    document.getElementById("modal").style.display = "none";
+                    isPaused = false;
+                } else {
+                    alert("SAI RỒI! Hãy chọn lại đáp án đúng để sống sót.");
+                }
+            };
+        });
+    </script>
+</body>
+</html>
