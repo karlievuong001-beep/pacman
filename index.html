@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pac-Man English Quiz</title>
+    <style>
+        body { background-color: #222; color: white; font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; margin: 0; padding: 20px; }
+        .controls { margin-bottom: 20px; background: #333; padding: 15px; border-radius: 8px; display: inline-block; }
+        canvas { background-color: black; border: 4px solid #1919A6; display: block; margin: 0 auto; box-shadow: 0 0 15px #0ff; border-radius: 5px; }
+        #ui { font-size: 22px; font-weight: bold; color: #ffcc00; margin-top: 10px; }
+        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10; }
+        #modal-content { background: #2b2b2b; padding: 30px; width: 550px; margin: 50px auto; border-radius: 12px; border: 3px solid #ffcc00; max-height: 80vh; overflow-y: auto; }
+        #question-text { font-size: 20px; margin-bottom: 15px; }
+        .q-image { max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 15px; }
+        .btn { display: flex; align-items: center; width: 100%; margin: 10px 0; padding: 10px; background: #444; color: white; border: 2px solid transparent; cursor: pointer; border-radius: 6px; font-size: 16px; transition: 0.2s; text-align: left; }
+        .btn img { max-height: 50px; margin-right: 15px; border-radius: 4px; }
+        .btn:hover { background: #ffcc00; color: black; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <div id="ui">Điểm: <span id="score">0</span> &nbsp;|&nbsp; Đã ăn: <span id="dot-count">0</span>/3</div>
+        <p style="font-size:14px; color:#aaa; margin-top:5px;">Sử dụng 4 phím mũi tên trên bàn phím để di chuyển</p>
+    </div>
+
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+    <div id="modal">
+        <div id="modal-content">
+            <h2 id="question-text">Loading...</h2>
+            <div id="question-media"></div>
+            <div id="answers"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        
+        let score = 0, dotCount = 0, isPaused = false;
+        const tileSize = 20;
+        let player = { x: 200, y: 200, size: 10, dx: 0, dy: 0 };
+        let dots = [];
+        
+        function initDots() {
+            dots = [];
+            for(let i=0; i<40; i++) {
+                dots.push({ x: Math.floor(Math.random() * 20) * 20 + 10, y: Math.floor(Math.random() * 20) * 20 + 10 });
+            }
+        }
+        initDots();
+
+        let questions = [
+            { 
+                q: "What animal is shown in this picture?", 
+                image: "https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=300&q=80", 
+                options: [{ text: "A. Dog" }, { text: "B. Cat" }, { text: "C. Rabbit" }, { text: "D. Mouse" }],
+                correct: 1 
+            },
+            { 
+                q: "Choose the picture that represents an 'Apple':", 
+                options: [
+                    { text: "A.", img: "https://images.unsplash.com/photo-1560806887-1e4cd0b6fac6?auto=format&fit=crop&w=100&q=80" },
+                    { text: "B.", img: "https://images.unsplash.com/photo-1528825871115-3581a5387919?auto=format&fit=crop&w=100&q=80" }
+                ],
+                correct: 0 
+            },
+            { 
+                q: "Choose the synonym for 'Ubiquitous':", 
+                options: [{ text: "A. Rare" }, { text: "B. Found everywhere" }, { text: "C. Expensive" }, { text: "D. Hidden" }], 
+                correct: 1 
+            }
+        ];
+
+        document.addEventListener("keydown", (e) => {
+            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) { e.preventDefault(); }
+            if (e.key === "ArrowUp") { player.dx = 0; player.dy = -tileSize; }
+            if (e.key === "ArrowDown") { player.dx = 0; player.dy = tileSize; }
+            if (e.key === "ArrowLeft") { player.dx = -tileSize; player.dy = 0; }
+            if (e.key === "ArrowRight") { player.dx = tileSize; player.dy = 0; }
+        });
+
+        function drawPlayer() {
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size, 0.2 * Math.PI, 1.8 * Math.PI);
+            ctx.lineTo(player.x, player.y);
+            ctx.fillStyle = "yellow"; ctx.fill(); ctx.closePath();
+        }
+
+        function drawDots() {
+            ctx.fillStyle = "white";
+            dots.forEach(dot => {
+                ctx.beginPath(); ctx.arc(dot.x, dot.y, 3, 0, Math.PI * 2); ctx.fill(); ctx.closePath();
+            });
+        }
+
+        function update() {
+            if (isPaused) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            player.x += player.dx; player.y += player.dy;
+            if (player.x < 0) player.x = canvas.width - 10;
+            if (player.x > canvas.width) player.x = 10;
+            if (player.y < 0) player.y = canvas.height - 10;
+            if (player.y > canvas.height) player.y = 10;
+            player.dx = 0; player.dy = 0;
+
+            for (let i = 0; i < dots.length; i++) {
+                if (Math.hypot(player.x - dots[i].x, player.y - dots[i].y) < player.size + 3) {
+                    dots.splice(i, 1);
+                    score += 10; dotCount++;
+                    document.getElementById("score").innerText = score;
+                    document.getElementById("dot-count").innerText = dotCount;
+                    
+                    if (dotCount === 3) { setTimeout(triggerQuestion, 100); }
+                    if (dots.length === 0) initDots();
+                    break;
+                }
+            }
+            drawDots(); drawPlayer();
+        }
+
+        function triggerQuestion() {
+            isPaused = true;
+            const modal = document.getElementById("modal");
+            const qData = questions[Math.floor(Math.random() * questions.length)];
+            
+            document.getElementById("question-text").innerText = qData.q;
+            const mediaDiv = document.getElementById("question-media");
+            mediaDiv.innerHTML = qData.image ? `<img src="${qData.image}" class="q-image">` : "";
+            
+            const ansDiv = document.getElementById("answers");
+            ansDiv.innerHTML = "";
+            qData.options.forEach((opt, index) => {
+                let btn = document.createElement("button");
+                btn.className = "btn";
+                let btnContent = opt.img ? `<img src="${opt.img}">` : "";
+                btnContent += `<span>${opt.text}</span>`;
+                btn.innerHTML = btnContent;
+                btn.onclick = () => checkAnswer(index, qData.correct);
+                ansDiv.appendChild(btn);
+            });
+            modal.style.display = "block";
+        }
+
+        function checkAnswer(selectedIndex, correctIndex) {
+            if (selectedIndex === correctIndex) { score += 50; }
+            document.getElementById("score").innerText = score;
+            dotCount = 0;
+            document.getElementById("dot-count").innerText = dotCount;
+            document.getElementById("modal").style.display = "none";
+            isPaused = false;
+        }
+
+        setInterval(update, 120); 
+    </script>
+</body>
+</html>
