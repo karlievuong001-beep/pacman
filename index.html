@@ -14,60 +14,35 @@
             margin: 0; 
             padding: 20px; 
         }
-        
         #header {
-            display: flex;
-            justify-content: space-around;
-            width: 500px;
-            margin: 0 auto 20px auto;
-            font-size: 14px;
-            color: #fff;
+            display: flex; justify-content: space-around; width: 500px;
+            margin: 0 auto 20px auto; font-size: 14px; color: #fff;
         }
-
         .highlight { color: #ffff00; }
-
         canvas { 
-            background-color: black; 
-            display: block; 
-            margin: 0 auto; 
-            image-rendering: pixelated; /* Giữ nét răng cưa cổ điển */
+            background-color: black; display: block; margin: 0 auto; 
+            image-rendering: pixelated; 
         }
-        
         #modal { 
             display: none; position: fixed; top: 0; left: 0; 
-            width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.85); 
-            z-index: 10; 
+            width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10; 
         }
-        
         #modal-content { 
             background: black; padding: 30px; width: 600px; 
-            margin: 10vh auto; 
-            border: 4px solid #1919A6; /* Viền xanh chuẩn Pacman */
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(25, 25, 166, 0.8);
-            font-family: 'Segoe UI', Tahoma, sans-serif; /* Chữ câu hỏi dễ đọc hơn */
+            margin: 10vh auto; border: 4px solid #1919A6; 
+            border-radius: 10px; box-shadow: 0 0 20px rgba(25, 25, 166, 0.8);
+            font-family: 'Segoe UI', Tahoma, sans-serif;
         }
-        
         #question-text { 
-            font-size: 22px; color: yellow; margin-bottom: 20px; 
-            font-family: 'Press Start 2P', cursive;
-            line-height: 1.5;
-            font-size: 16px;
+            color: yellow; margin-bottom: 20px; line-height: 1.5; font-size: 20px; font-weight: bold;
         }
-        
         .btn { 
-            display: block; width: 100%; 
-            margin: 12px 0; padding: 15px; 
-            background: #222; color: white; 
-            border: 2px solid #555; cursor: pointer; 
-            font-size: 18px; font-weight: bold;
+            display: block; width: 100%; margin: 12px 0; padding: 15px; 
+            background: #222; color: white; border: 2px solid #555; 
+            cursor: pointer; font-size: 18px; font-weight: bold;
             transition: 0.2s; text-align: left;
         }
-        
-        .btn:hover { 
-            background: #1919A6; border-color: white; 
-        }
+        .btn:hover { background: #1919A6; border-color: white; }
     </style>
 </head>
 <body>
@@ -87,13 +62,15 @@
     </div>
 
     <script>
+    // Bọc toàn bộ code trong window.onload để chống lỗi khởi tạo mảng
+    window.onload = function() {
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
         
         let score = 0, dotCount = 0, isPaused = false;
         const tileSize = 20;
         
-        // Bản đồ mê cung: 1 = Tường, 2 = Chấm, 0 = Đường đi trống
+        // Bản đồ: 1 = Tường, 2 = Chấm, 0 = Đường đi
         const map = [
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
             [1,2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2,1],
@@ -118,29 +95,125 @@
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
         ];
 
-        // Nhân vật
         let player = { x: 10 * tileSize, y: 15 * tileSize, dx: 0, dy: 0, size: 8, mouthOpen: 0 };
+        let nextDx = 0, nextDy = 0;
         
         let questions = [
-            { 
-                q: "Find the error: 'She don't like playing tennis.'", 
-                options: ["A. She", "B. don't", "C. like", "D. playing"],
-                correct: 1 
-            },
-            { 
-                q: "What does 'Apple' mean in Vietnamese?", 
-                options: ["A. Quả Cam", "B. Quả Táo", "C. Quả Chuối", "D. Quả Nho"],
-                correct: 1 
-            },
-            { 
-                q: "Complete: 'I have been working here _____ 2010.'", 
-                options: ["A. since", "B. for", "C. in", "D. at"], 
-                correct: 0 
-            }
+            { q: "Find the error: 'She don't like playing tennis.'", options: ["A. She", "B. don't", "C. like", "D. playing"], correct: 1 },
+            { q: "What does 'Apple' mean in Vietnamese?", options: ["A. Quả Cam", "B. Quả Táo", "C. Quả Chuối", "D. Quả Nho"], correct: 1 },
+            { q: "Complete: 'I have been working here _____ 2010.'", options: ["A. since", "B. for", "C. in", "D. at"], correct: 0 }
         ];
 
-        // Nhận lệnh di chuyển
-        let nextDx = 0, nextDy = 0;
         document.addEventListener("keydown", (e) => {
-            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
-            if (e.key === "ArrowUp") { nextDx = 0; nextDy = -2
+            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) { e.preventDefault(); }
+            if (e.key === "ArrowUp") { nextDx = 0; nextDy = -2; }
+            if (e.key === "ArrowDown") { nextDx = 0; nextDy = 2; }
+            if (e.key === "ArrowLeft") { nextDx = -2; nextDy = 0; }
+            if (e.key === "ArrowRight") { nextDx = 2; nextDy = 0; }
+        });
+
+        function drawMap() {
+            for (let r = 0; r < map.length; r++) {
+                for (let c = 0; c < map[r].length; c++) {
+                    if (map[r][c] === 1) {
+                        ctx.strokeStyle = "#1919A6"; ctx.lineWidth = 2;
+                        ctx.strokeRect(c * tileSize, r * tileSize, tileSize, tileSize);
+                    } else if (map[r][c] === 2) {
+                        ctx.fillStyle = "#ffb8ae"; ctx.beginPath();
+                        ctx.arc(c * tileSize + tileSize/2, r * tileSize + tileSize/2, 2, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
+        function drawPlayer() {
+            ctx.beginPath();
+            let mouth = isPaused ? 0.2 : (Math.sin(player.mouthOpen) * 0.2 + 0.2); 
+            player.mouthOpen += 0.3;
+            
+            let angle = 0;
+            if (player.dx > 0) angle = 0;
+            else if (player.dx < 0) angle = Math.PI;
+            else if (player.dy > 0) angle = Math.PI / 2;
+            else if (player.dy < 0) angle = -Math.PI / 2;
+
+            ctx.arc(player.x + tileSize/2, player.y + tileSize/2, player.size, angle + mouth * Math.PI, angle + (2 - mouth) * Math.PI);
+            ctx.lineTo(player.x + tileSize/2, player.y + tileSize/2);
+            ctx.fillStyle = "yellow"; ctx.fill(); ctx.closePath();
+        }
+
+        function checkCollision(x, y) {
+            let margin = 4;
+            let left = Math.floor((x + margin) / tileSize);
+            let right = Math.floor((x + tileSize - margin - 1) / tileSize);
+            let top = Math.floor((y + margin) / tileSize);
+            let bottom = Math.floor((y + tileSize - margin - 1) / tileSize);
+            
+            // Xuyên hầm an toàn
+            if (left < 0 || right >= map[0].length) return false; 
+            // Chống lỗi crash mảng
+            if (top < 0 || bottom >= map.length) return true;
+
+            return map[top][left] === 1 || map[top][right] === 1 || map[bottom][left] === 1 || map[bottom][right] === 1;
+        }
+
+        function update() {
+            if (isPaused) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawMap();
+
+            if (!checkCollision(player.x + nextDx, player.y + nextDy)) {
+                player.dx = nextDx; player.dy = nextDy;
+            }
+            if (!checkCollision(player.x + player.dx, player.y + player.dy)) {
+                player.x += player.dx; player.y += player.dy;
+            }
+
+            if (player.x < -tileSize) player.x = canvas.width;
+            if (player.x > canvas.width) player.x = -tileSize;
+
+            let centerC = Math.floor((player.x + tileSize/2) / tileSize);
+            let centerR = Math.floor((player.y + tileSize/2) / tileSize);
+
+            if (centerC >= 0 && centerC < map[0].length && map[centerR] && map[centerR][centerC] === 2) {
+                map[centerR][centerC] = 0; score += 10; dotCount++;
+                document.getElementById("score").innerText = score;
+                document.getElementById("dot-count").innerText = dotCount;
+                if (dotCount === 5) { setTimeout(triggerQuestion, 100); }
+            }
+            drawPlayer();
+        }
+
+        function triggerQuestion() {
+            isPaused = true;
+            const modal = document.getElementById("modal");
+            const qData = questions[Math.floor(Math.random() * questions.length)];
+            document.getElementById("question-text").innerText = qData.q;
+            const ansDiv = document.getElementById("answers");
+            ansDiv.innerHTML = "";
+            qData.options.forEach((opt, index) => {
+                let btn = document.createElement("button");
+                btn.className = "btn"; btn.innerText = opt;
+                btn.onclick = () => checkAnswer(index, qData.correct);
+                ansDiv.appendChild(btn);
+            });
+            modal.style.display = "block";
+        }
+
+        function checkAnswer(selectedIndex, correctIndex) {
+            if (selectedIndex === correctIndex) { 
+                score += 50; document.getElementById("score").innerText = score;
+                dotCount = 0; document.getElementById("dot-count").innerText = dotCount;
+                document.getElementById("modal").style.display = "none";
+                isPaused = false;
+            } else {
+                alert("RẤT TIẾC, SAI RỒI! Bạn phải trả lời ĐÚNG mới được đi tiếp.");
+            }
+        }
+
+        setInterval(update, 20); 
+    };
+    </script>
+</body>
+</html>
