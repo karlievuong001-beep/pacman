@@ -6,7 +6,6 @@
     <title>Classic Pac-Man English</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        /* Đảm bảo nền luôn chuẩn */
         body { 
             background-color: black; color: white; 
             font-family: 'Press Start 2P', cursive; 
@@ -66,7 +65,6 @@
         .start-text { color: black; margin-top: 30px; font-size: 14px; animation: blink 1s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
-        /* --- GIAO DIỆN GAME --- */
         #game-container { 
             display: none; width: 100vw; height: 100vh; 
             flex-direction: column; align-items: center; justify-content: center;
@@ -87,7 +85,6 @@
             background-color: black; display: block; image-rendering: pixelated; 
         }
 
-        /* --- MODAL & GAME OVER --- */
         #modal { 
             display: none; position: fixed; top: 0; left: 0; 
             width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100; 
@@ -184,11 +181,12 @@
             let player = { x: 10 * tileSize, y: 16 * tileSize, dx: 0, dy: 0, size: 9, mouth: 0 };
             let nextDx = 0, nextDy = 0;
 
+            // Đưa 4 con ma ra ngoài hành lang (Hàng 8) để chúng đuổi ngay lập tức
             let ghosts = [
-                { x: 9 * tileSize, y: 10 * tileSize, color: "red", dx: -2, dy: 0, isVulnerable: false },    
-                { x: 10 * tileSize, y: 10 * tileSize, color: "#FFB8FF", dx: 0, dy: -2, isVulnerable: false }, 
-                { x: 11 * tileSize, y: 10 * tileSize, color: "#00FFFF", dx: 2, dy: 0, isVulnerable: false },  
-                { x: 10 * tileSize, y: 9 * tileSize, color: "#FFB852", dx: -2, dy: 0, isVulnerable: false }   
+                { x: 9 * tileSize, y: 8 * tileSize, color: "red", dx: -2, dy: 0, isVulnerable: false },    
+                { x: 10 * tileSize, y: 8 * tileSize, color: "#FFB8FF", dx: 2, dy: 0, isVulnerable: false }, 
+                { x: 11 * tileSize, y: 8 * tileSize, color: "#00FFFF", dx: -2, dy: 0, isVulnerable: false },  
+                { x: 12 * tileSize, y: 8 * tileSize, color: "#FFB852", dx: 2, dy: 0, isVulnerable: false }   
             ];
 
             let questions = [
@@ -247,7 +245,7 @@
 
             function drawGhosts() {
                 ghosts.forEach(g => {
-                    ctx.fillStyle = g.isVulnerable ? "#0033ff" : g.color; // Chuyển xanh khi yếu
+                    ctx.fillStyle = g.isVulnerable ? "#0033ff" : g.color;
                     ctx.beginPath();
                     let gx = g.x + 2, gy = g.y + 2, gw = 16, gh = 16;
                     ctx.arc(gx + gw/2, gy + gh/2, gw/2, Math.PI, 0); 
@@ -261,7 +259,7 @@
                     ctx.fillStyle = "white";
                     ctx.beginPath(); ctx.arc(gx+5, gy+6, 3, 0, Math.PI*2); ctx.fill();
                     ctx.beginPath(); ctx.arc(gx+11, gy+6, 3, 0, Math.PI*2); ctx.fill();
-                    ctx.fillStyle = g.isVulnerable ? "white" : "blue"; // Mắt khác biệt khi chạy trốn
+                    ctx.fillStyle = g.isVulnerable ? "white" : "blue"; 
                     let ex = g.dx > 0 ? 1 : (g.dx < 0 ? -1 : 0);
                     let ey = g.dy > 0 ? 1 : (g.dy < 0 ? -1 : 0);
                     ctx.beginPath(); ctx.arc(gx+5+ex, gy+6+ey, 1.5, 0, Math.PI*2); ctx.fill();
@@ -276,6 +274,8 @@
                 
                 if (left < 0 || right >= map[0].length) return false; 
                 if (top < 0 || bottom >= map.length) return true;
+                
+                // Cổng hồng (3) là tường với mọi đối tượng
                 return map[top][left] === 1 || map[top][right] === 1 || map[bottom][left] === 1 || map[bottom][right] === 1 || map[top][left] === 3 || map[top][right] === 3;
             }
 
@@ -284,14 +284,13 @@
                 if (powerTimer) clearTimeout(powerTimer);
                 powerTimer = setTimeout(() => {
                     ghosts.forEach(g => { g.isVulnerable = false; });
-                }, 10000); // 10 giây hồi phục
+                }, 10000); // 10 giây
             }
 
             function updateGhosts() {
                 ghosts.forEach(g => {
-                    let speed = g.isVulnerable ? 1 : 2; // Chậm lại khi bị yếu
+                    let speed = g.isVulnerable ? 1 : 2; 
                     
-                    // Logic AI thông minh: Chỉ tính toán khi nằm chính giữa ô
                     if (g.x % tileSize === 0 && g.y % tileSize === 0) {
                         let c = g.x / tileSize; let r = g.y / tileSize;
                         let validMoves = [];
@@ -299,26 +298,33 @@
                         let dirX = g.dx > 0 ? 1 : (g.dx < 0 ? -1 : 0);
                         let dirY = g.dy > 0 ? 1 : (g.dy < 0 ? -1 : 0);
 
-                        // Tìm đường không đụng tường và không quay ngược lại
                         if (dirX !== -1 && c + 1 < map[0].length && map[r][c+1] !== 1 && map[r][c+1] !== 3) validMoves.push({dx: speed, dy: 0});
                         if (dirX !== 1 && c - 1 >= 0 && map[r][c-1] !== 1 && map[r][c-1] !== 3) validMoves.push({dx: -speed, dy: 0});
                         if (dirY !== -1 && r + 1 < map.length && map[r+1][c] !== 1 && map[r+1][c] !== 3) validMoves.push({dx: 0, dy: speed});
                         if (dirY !== 1 && r - 1 >= 0 && map[r-1][c] !== 1 && map[r-1][c] !== 3) validMoves.push({dx: 0, dy: -speed});
 
                         if (validMoves.length > 0) {
-                            // Sắp xếp lối đi dựa trên khoảng cách tới Pacman
+                            // Tạo chiến thuật rượt đuổi khác nhau cho từng con ma để chống dính chùm
+                            let targetX = player.x;
+                            let targetY = player.y;
+
+                            if (g.color === "#FFB8FF") { targetX += 40; targetY -= 40; } // Pinky chặn trước
+                            if (g.color === "#00FFFF") { targetX -= 40; targetY += 40; } // Inky bọc lót
+                            if (g.color === "#FFB852") { targetX -= 60; targetY -= 60; } // Clyde đi vòng
+
                             validMoves.sort((a, b) => {
-                                let distA = Math.hypot((g.x + a.dx*10) - player.x, (g.y + a.dy*10) - player.y);
-                                let distB = Math.hypot((g.x + b.dx*10) - player.x, (g.y + b.dy*10) - player.y);
-                                return g.isVulnerable ? distB - distA : distA - distB; // Nếu yếu thì chạy ra xa, nếu khỏe thì rượt
+                                let distA = Math.hypot((g.x + a.dx*10) - targetX, (g.y + a.dy*10) - targetY);
+                                let distB = Math.hypot((g.x + b.dx*10) - targetX, (g.y + b.dy*10) - targetY);
+                                return g.isVulnerable ? distB - distA : distA - distB; 
                             });
-                            // Thêm chút ngẫu nhiên để ma không dính lẹo vào nhau
+                            
                             let chosenMove = validMoves[0];
-                            if (validMoves.length > 1 && Math.random() < 0.2) chosenMove = validMoves[1];
+                            // Thêm tí ngẫu nhiên để đường đi không bị lặp lại tuyệt đối
+                            if (validMoves.length > 1 && Math.random() < 0.15) chosenMove = validMoves[1];
                             
                             g.dx = chosenMove.dx; g.dy = chosenMove.dy;
                         } else {
-                            g.dx = -g.dx; g.dy = -g.dy; // Ngõ cụt thì quay đầu
+                            g.dx = -g.dx; g.dy = -g.dy; 
                         }
                     }
 
@@ -327,11 +333,11 @@
                     if (g.x < -tileSize) g.x = canvas.width;
                     if (g.x > canvas.width) g.x = -tileSize;
 
-                    // Xử lý Va chạm với Pacman
                     if (Math.hypot(player.x - g.x, player.y - g.y) < 15) {
                         if (g.isVulnerable) {
                             score += 200; document.getElementById("score").innerText = score;
-                            g.x = 10 * tileSize; g.y = 10 * tileSize; // Bị tiêu diệt, đưa về chuồng
+                            // Bị ăn, cho bay về điểm xuất phát phía trên chuồng
+                            g.x = 10 * tileSize; g.y = 8 * tileSize; 
                             g.isVulnerable = false;
                         } else {
                             handleDeath();
@@ -350,7 +356,9 @@
                     setTimeout(() => {
                         player.x = 10 * tileSize; player.y = 16 * tileSize; player.dx = 0; player.dy = 0;
                         ghosts.forEach((g, i) => {
-                            g.x = (9 + i%3) * tileSize; g.y = 10 * tileSize;
+                            g.x = (9 + (i % 4)) * tileSize; g.y = 8 * tileSize;
+                            g.dx = (i % 2 === 0) ? -2 : 2; g.dy = 0;
+                            g.isVulnerable = false;
                         });
                         isPaused = false;
                     }, 1000);
@@ -376,12 +384,12 @@
                 let centerR = Math.floor((player.y + tileSize/2) / tileSize);
 
                 if (centerC >= 0 && centerC < map[0].length && map[centerR]) {
-                    if (map[centerR][centerC] === 0) { // Ăn chấm nhỏ
+                    if (map[centerR][centerC] === 0) { 
                         map[centerR][centerC] = 2; score += 10; dotCount++;
                         document.getElementById("score").innerText = score;
                         document.getElementById("dot-count").innerText = dotCount + " / 5";
                         if (dotCount === 5) { setTimeout(triggerQuestion, 100); }
-                    } else if (map[centerR][centerC] === 4) { // Ăn siêu chấm
+                    } else if (map[centerR][centerC] === 4) { 
                         map[centerR][centerC] = 2; score += 50; document.getElementById("score").innerText = score;
                         activatePowerPellet();
                     }
